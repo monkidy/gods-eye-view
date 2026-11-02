@@ -15,7 +15,7 @@ const geoStatus = message => { $('foot-status').textContent = message }
 function clearSelection() {
   state.selectedId = null
   $('event-title').textContent = 'La Terre, en contexte'
-  $('event-body').textContent = 'Sélectionne une observation affichée pour examiner sa provenance, sa date et son état de preuve.'
+  $('event-body').textContent = 'La sélection d’une observation affichée permet d’examiner sa provenance, sa date et son état de preuve.'
   $('event-meta').textContent = ''
   $('event-source').hidden = true
   $('event-source').removeAttribute('href')
