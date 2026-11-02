@@ -114,7 +114,7 @@ export function createExplorer(C) {
     })
   }
   async function discover() {
-    if (!place) return message('Choisis un lieu sur le globe ou saisis ses coordonnées.')
+    if (!place) return message('Choisissez un lieu sur le globe ou saisissez ses coordonnées.')
     const generation = ++nearbyGeneration, query = { ...place }
     clearMedia(); $('local-results').replaceChildren(); $('resource-title').textContent = 'Ressources autour du lieu'
     $('resource-card').hidden = true
@@ -151,7 +151,7 @@ export function createExplorer(C) {
   // uses explicit script actions; do not widen sandbox or form-action rights.
   function goToPlace() {
     const lat = $('place-lat').value.trim(), lon = $('place-lon').value.trim()
-    if (!lat || !lon) return message('Renseigne les deux coordonnées.')
+    if (!lat || !lon) return message('Renseignez les deux coordonnées.')
     selectPlace(Number(lat), Number(lon), { fly: true })
   }
   $('go-place').addEventListener('click', goToPlace)
@@ -166,7 +166,7 @@ export function createExplorer(C) {
   $('imagery-day').value = yesterday; $('imagery-day').max = yesterday
   $('imagery-day').min = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
   $('open-imagery').addEventListener('click', () => {
-    if (!place) return message('Choisis d’abord un lieu pour l’image satellite.')
+    if (!place) return message('Choisissez d’abord un lieu pour l’image satellite.')
     $('resource-card').hidden = false
     $('resource-title').textContent = 'VIIRS NOAA-21 · NASA Worldview'
     $('resource-meta').textContent = 'Mosaïque quotidienne · environ 250 m/pixel · nuages possibles · pas de direct ni de détail de rue.'

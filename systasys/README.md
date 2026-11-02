@@ -32,6 +32,11 @@ node systasys/build-upstream.mjs
 node systasys/build.mjs
 ```
 
+The entry chunk retains all first-party UI text; the generated dependency engine
+is separately cached under `assets/build/`. The native voice guard continues to
+inspect the entry; it does not parse minified third-party variable names as French
+sentences. Both chunks remain in the immutable SHA-256 asset inventory.
+
 The server bridge bundles the fork's actual camera policy, Panoramax policy,
 imagery URL/area validation and TLE parser. MIT licence accompanies it. The build
 removes the unused i18n catalogue by verifying and preserving the original
