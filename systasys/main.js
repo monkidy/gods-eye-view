@@ -108,8 +108,9 @@ async function fetchBoundedWarRoom() {
       }
     } catch (error) {
       // Releasing a lock alone leaves the upstream response streaming. Refuse
-      // oversized/failed bodies and cancel their producer before returning.
-      try { await reader.cancel() } catch { /* preserve the original refusal */ }
+      // immediately: cancellation is cleanup, never a promise the UI waits on.
+      controller.abort()
+      try { Promise.resolve(reader.cancel()).catch(() => {}) } catch { /* preserve the original refusal */ }
       throw error
     } finally { reader.releaseLock() }
     const bytes = new Uint8Array(totalBytes)

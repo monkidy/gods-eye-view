@@ -128,3 +128,41 @@ test('oversized declared length aborts before a stream reader is opened', async 
   assert.equal(opened, false)
   assert.equal(signal.aborted, true)
 })
+test('pending or failed cancellation cannot stall refusal or disable later refreshes', async () => {
+  for (const cancel of [
+    () => new Promise(() => {}),
+    () => { throw Error('CANCEL_SYNC_FAILURE') },
+    () => Promise.reject(Error('CANCEL_ASYNC_FAILURE')),
+  ]) {
+    const h = await harness()
+    await load(h, row())
+    h.hooks.select(h.hooks.state.points[0])
+    let signal
+    let canceled = false
+    let released = false
+    h.setResult((_url, options) => {
+      signal = options.signal
+      return { ok: true, headers: new Headers({ 'content-type': 'application/json' }),
+        body: { getReader: () => ({
+          read: async () => ({ done: false, value: new Uint8Array(1048577) }),
+          cancel: () => { canceled = true; return cancel() },
+          releaseLock: () => { released = true },
+        }) } }
+    })
+    let deadline
+    try {
+      await Promise.race([
+        h.hooks.readData(),
+        new Promise((_resolve, reject) => { deadline = setTimeout(() => reject(Error('REFUSAL_DID_NOT_SETTLE')), 200) }),
+      ])
+    } finally { clearTimeout(deadline) }
+    assert.equal(signal.aborted, true)
+    assert.equal(canceled, true)
+    assert.equal(released, true)
+    assert.equal(h.hooks.state.inFlight, false)
+    assert.equal(h.element('refresh').disabled, false)
+    assertCleared(h)
+    await load(h, row())
+    assert.equal(h.hooks.state.points.length, 1, 'a later refresh must remain usable')
+  }
+})
