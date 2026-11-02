@@ -102,7 +102,7 @@ async function readData() {
     state.points = model.points
     $('stat-total').textContent = String(model.total)
     $('stat-other').textContent = String(Math.max(0, model.total - model.points.length))
-    status('SPECTRA · réponse reçue, ' + model.points.length + ' points admissibles' + (model.truncated ? ' (limite de sécurité)' : ''))
+    status('SPECTRA · réponse reçue, ' + model.points.length + ' point' + (model.points.length === 1 ? '' : 's') + ' admissible' + (model.points.length === 1 ? '' : 's') + (model.truncated ? ' (limite de sécurité)' : ''))
   } catch {
     state.points = []
     $('stat-total').textContent = '—'
