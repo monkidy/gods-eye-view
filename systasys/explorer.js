@@ -147,11 +147,16 @@ export function createExplorer(C) {
     if (fly && viewer) viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(lon, lat, 45000), duration: 1.1 })
     if (lookup) void discover()
   }
-  $('place-form').addEventListener('submit', event => {
-    event.preventDefault()
+  // N4's iframe intentionally forbids form submission. Coordinate navigation
+  // uses explicit script actions; do not widen sandbox or form-action rights.
+  function goToPlace() {
     const lat = $('place-lat').value.trim(), lon = $('place-lon').value.trim()
     if (!lat || !lon) return message('Renseigne les deux coordonnées.')
     selectPlace(Number(lat), Number(lon), { fly: true })
+  }
+  $('go-place').addEventListener('click', goToPlace)
+  for (const id of ['place-lat', 'place-lon']) $(id).addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); goToPlace() }
   })
   document.querySelectorAll('[data-place]').forEach(button => button.addEventListener('click', () => {
     const [lat, lon] = button.dataset.place.split(',').map(Number); selectPlace(lat, lon, { fly: true })

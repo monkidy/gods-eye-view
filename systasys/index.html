@@ -67,11 +67,11 @@
         <h2 id="place-name">Choisis un point sur Terre</h2>
         <p>Clique sur le globe ou zoome à l’échelle locale. Les catalogues se découvrent sans ouvrir de vidéo.</p>
         <div class="eye__presets" aria-label="Lieux à explorer"><button type="button" data-place="45.76005,4.83990">Lyon</button><button type="button" data-place="59.9139,10.7522">Oslo</button><button type="button" data-place="69.6492,18.9553">Tromsø</button></div>
-        <form id="place-form" class="eye__placeform">
+        <div id="place-form" class="eye__placeform" role="group" aria-label="Coordonnées du lieu">
           <label>Latitude<input id="place-lat" type="number" min="-90" max="90" step="any" required placeholder="45.76005" /></label>
           <label>Longitude<input id="place-lon" type="number" min="-180" max="180" step="any" required placeholder="4.83990" /></label>
-          <button type="submit">Aller</button>
-        </form>
+          <button id="go-place" type="button">Aller</button>
+        </div>
         <button id="discover" class="eye__action" type="button">Rechercher autour de ce lieu ↗</button>
         <p id="local-status" role="status">Caméras publiques de Norvège et photographies Panoramax, selon leur couverture réelle.</p>
         <div id="resource-card" class="eye__resourcecard" hidden>
