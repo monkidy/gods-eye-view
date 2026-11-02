@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium'
 import { FEEDS, normalize, filterPoints } from './model.js'
+import { createExplorer } from './explorer.js'
 import './style.css'
 
 // All Cesium workers, widgets and imagery must resolve to this same-origin, pinned release.
@@ -11,6 +12,7 @@ const state = { points: [], enabled: new Set(Object.keys(FEEDS)), period: 'fresh
 const fmt = at => new Date(at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC'
 const status = message => { $('connection').textContent = message }
 const geoStatus = message => { $('foot-status').textContent = message }
+const explorer = createExplorer(Cesium)
 
 function clearSelection() {
   state.selectedId = null
@@ -26,7 +28,8 @@ function renderSelection(item) {
   $('event-body').textContent = item.freshness === 'FRESH'
     ? 'Observation officielle récente avec reçu SPECTRA.'
     : 'Observation historique datée : elle ne constitue pas une alerte actuelle.'
-  $('event-meta').textContent = FEEDS[item.source].label + ' · ' + fmt(item.at) + ' · ' +
+  $('event-meta').textContent = FEEDS[item.source].label + ' · lu le ' + fmt(item.at) +
+    (item.publishedAt ? ' · publié le ' + fmt(item.publishedAt) : '') + ' · ' +
     item.freshness + ' · reçu ' + item.receipt
   $('event-source').hidden = false
   $('event-source').href = item.url
@@ -37,6 +40,7 @@ function select(item) {
   if (!current) return clearSelection()
   state.selectedId = current.id
   renderSelection(current)
+  explorer.selectPlace(current.lat, current.lon, { lookup: true })
   if (state.viewer) state.viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(current.lon, current.lat, 1800000), duration: 1.1,
   })
@@ -53,6 +57,7 @@ function render() {
   $('layer-count').textContent = String(state.enabled.size)
   $('count-usgs').textContent = String(state.points.filter(p => p.source === 'usgs_earthquakes_global_free').length)
   $('count-gdacs').textContent = String(state.points.filter(p => p.source === 'gdacs_global_disasters_free').length)
+  $('count-eonet').textContent = String(state.points.filter(p => p.source === 'nasa_eonet_open_events_public').length)
   const viewer = state.viewer
   if (viewer) {
     viewer.entities.removeAll()
@@ -166,6 +171,7 @@ async function startGlobe() {
     viewer.screenSpaceEventHandler.setInputAction(movement => {
       const picked = viewer.scene.pick(movement.position)
       if (picked?.id?.eyeRecord) select(picked.id.eyeRecord)
+      else explorer.pick(picked, movement.position)
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
     viewer.camera.changed.addEventListener(() => {
       const c = viewer.camera.positionCartographic
@@ -179,6 +185,7 @@ async function startGlobe() {
       { maximumLevel: 2 },
     )
     viewer.imageryLayers.addImageryProvider(imagery)
+    explorer.attach(viewer)
     viewer.scene.requestRender()
   } catch {
     if (state.viewer && !state.viewer.isDestroyed()) {
@@ -190,7 +197,7 @@ async function startGlobe() {
   }
 }
 
-for (const [feed, id] of [['usgs_earthquakes_global_free', 'layer-usgs'], ['gdacs_global_disasters_free', 'layer-gdacs']]) {
+for (const [feed, id] of [['usgs_earthquakes_global_free', 'layer-usgs'], ['gdacs_global_disasters_free', 'layer-gdacs'], ['nasa_eonet_open_events_public', 'layer-eonet']]) {
   $(id).addEventListener('change', event => {
     if (event.target.checked) state.enabled.add(feed); else state.enabled.delete(feed)
     render()
@@ -204,7 +211,7 @@ document.querySelectorAll('[data-period]').forEach(button => button.addEventList
 }))
 $('refresh').addEventListener('click', readData)
 $('home').addEventListener('click', () => state.viewer?.camera.flyHome(1.1))
-$('zoom-in').addEventListener('click', () => state.viewer?.camera.zoomIn(1000000))
-$('zoom-out').addEventListener('click', () => state.viewer?.camera.zoomOut(1000000))
+$('zoom-in').addEventListener('click', () => { if (state.viewer) state.viewer.camera.zoomIn(Math.max(50, state.viewer.camera.positionCartographic.height * 0.45)) })
+$('zoom-out').addEventListener('click', () => { if (state.viewer) state.viewer.camera.zoomOut(Math.max(50, state.viewer.camera.positionCartographic.height * 0.65)) })
 void startGlobe()
 void readData()

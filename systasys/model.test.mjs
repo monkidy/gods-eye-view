@@ -10,6 +10,15 @@ const usgs = (change = {}) => ({
   ...change,
 })
 const data = (...rows) => ({ intel_items: rows })
+test('EONET consumes the existing source ID and never rejuvenates an old event from its recent read', () => {
+  const eonet = usgs({ source_id: 'nasa_eonet_open_events_public', external_provenance_url: 'https://eonet.gsfc.nasa.gov/api/v3/events/test',
+    published_at_utc: '2026-08-03T12:00:00Z' })
+  const item = normalize(data(eonet), now).points[0]
+  assert.equal(item.freshness, 'AGEING')
+  assert.equal(item.publishedAt, eonet.published_at_utc)
+  assert.equal(normalize(data({ ...eonet, published_at_utc: '2026-11-02T10:00:00Z' }), now).points[0].freshness, 'FRESH')
+  assert.equal(normalize(data({ ...eonet, published_at_utc: null }), now).points[0].freshness, 'AGEING')
+})
 test('read actual war-room intel_items and POINT WGS84 with receipt', () => {
   const model = normalize(data(usgs()), now)
   assert.equal(model.points.length, 1)

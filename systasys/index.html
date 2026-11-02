@@ -16,10 +16,15 @@
       <div class="eye__brand"><span class="eye__monogram">S</span><span><small>SYSTASYS / INTELLIGENCE GÉOSPATIALE</small><strong>World’s Eye</strong></span></div>
       <div class="eye__connection"><span class="eye__pulse"></span><span id="connection">Connexion SPECTRA en attente</span></div>
     </header>
-    <aside class="eye__rail" aria-label="Couches de renseignement">
-      <div class="eye__railheading">COUCHES ACTIVES <span id="layer-count">0</span></div>
+    <aside id="layers-panel" class="eye__rail" aria-label="Couches de renseignement">
+      <div class="eye__railheading">COUCHES SPECTRA <span id="layer-count">0</span></div>
       <label class="eye__layer"><input id="layer-usgs" type="checkbox" checked /><span class="eye__dot eye__dot--usgs"></span><span>Séismes <small>USGS · données officielles</small></span><span id="count-usgs" class="eye__layercount">0</span></label>
       <label class="eye__layer"><input id="layer-gdacs" type="checkbox" checked /><span class="eye__dot eye__dot--gdacs"></span><span>Catastrophes <small>GDACS · lecture interne</small></span><span id="count-gdacs" class="eye__layercount">0</span></label>
+      <label class="eye__layer"><input id="layer-eonet" type="checkbox" checked /><span class="eye__dot eye__dot--eonet"></span><span>Événements naturels <small>NASA EONET · dates d’origine</small></span><span id="count-eonet" class="eye__layercount">0</span></label>
+      <div class="eye__sectionlabel">EXPLORER LES SOURCES PUBLIQUES</div>
+      <label class="eye__layer"><input id="layer-cameras" type="checkbox" /><span class="eye__dot eye__dot--cameras"></span><span>Caméras routières <small>Statens vegvesen · Norvège</small><small id="layer-status-cameras">Catalogue · images à la demande</small></span><span id="count-cameras" class="eye__layercount">—</span></label>
+      <label class="eye__layer"><input id="layer-satellites" type="checkbox" /><span class="eye__dot eye__dot--satellites"></span><span>Stations orbitales <small>CelesTrak · positions calculées</small><small id="layer-status-satellites">SGP4 · éléments datés</small></span><span id="count-satellites" class="eye__layercount">—</span></label>
+      <label class="eye__layer"><input id="layer-alerts" type="checkbox" /><span class="eye__dot eye__dot--gdacs"></span><span>Alertes météo sévères <small>NOAA · États-Unis et territoires</small><small id="layer-status-alerts">Zones officielles non expirées</small></span><span id="count-alerts" class="eye__layercount">—</span></label>
       <div class="eye__sectionlabel">TEMPORALITÉ</div>
       <div class="eye__segmented" role="group" aria-label="Fraîcheur des observations">
         <button type="button" data-period="fresh" aria-pressed="true">Vérifié</button>
@@ -38,18 +43,51 @@
     <section class="eye__hud" aria-label="Navigation et informations">
       <div class="eye__coords"><small>PLANÈTE TERRE</small><strong id="camera-position">Vue globale · 3D</strong></div>
       <div class="eye__nav">
+        <button type="button" id="toggle-layers" aria-expanded="false" aria-controls="layers-panel">Couches</button>
         <button type="button" id="home" title="Vue terrestre globale" aria-label="Vue terrestre globale">⌖</button>
         <button type="button" id="zoom-in" aria-label="Zoom avant">+</button>
         <button type="button" id="zoom-out" aria-label="Zoom arrière">−</button>
       </div>
     </section>
     <aside class="eye__inspector" aria-live="polite">
+      <div class="eye__tabs" role="tablist" aria-label="Explorer le globe">
+        <button id="tab-observations" role="tab" type="button" aria-selected="true" aria-controls="panel-observations">Observations</button>
+        <button id="tab-local" role="tab" type="button" aria-selected="false" aria-controls="panel-local">Explorer un lieu</button>
+      </div>
+      <section id="panel-observations" role="tabpanel" aria-labelledby="tab-observations">
       <div class="eye__inspectorkicker">ANALYSE / OBSERVATION</div>
       <h2 id="event-title">La Terre, en contexte</h2>
       <p id="event-body">Ouvre une couche ou sélectionne un événement pour examiner sa provenance, sa date et son état de preuve.</p>
       <div id="event-meta" class="eye__meta"></div>
       <a id="event-source" class="eye__source" target="_blank" rel="noopener noreferrer" hidden>Source officielle ↗</a>
       <div id="event-list" class="eye__eventlist" aria-label="Observations affichées"></div>
+      </section>
+      <section id="panel-local" role="tabpanel" aria-labelledby="tab-local" hidden>
+        <div class="eye__inspectorkicker">AUTOUR D’UN LIEU</div>
+        <h2 id="place-name">Choisis un point sur Terre</h2>
+        <p>Clique sur le globe ou zoome à l’échelle locale. Les catalogues se découvrent sans ouvrir de vidéo.</p>
+        <div class="eye__presets" aria-label="Lieux à explorer"><button type="button" data-place="45.76005,4.83990">Lyon</button><button type="button" data-place="59.9139,10.7522">Oslo</button><button type="button" data-place="69.6492,18.9553">Tromsø</button></div>
+        <form id="place-form" class="eye__placeform">
+          <label>Latitude<input id="place-lat" type="number" min="-90" max="90" step="any" required placeholder="45.76005" /></label>
+          <label>Longitude<input id="place-lon" type="number" min="-180" max="180" step="any" required placeholder="4.83990" /></label>
+          <button type="submit">Aller</button>
+        </form>
+        <button id="discover" class="eye__action" type="button">Rechercher autour de ce lieu ↗</button>
+        <p id="local-status" role="status">Caméras publiques de Norvège et photographies Panoramax, selon leur couverture réelle.</p>
+        <div id="resource-card" class="eye__resourcecard" hidden>
+          <h3 id="resource-title">Images à la demande</h3>
+          <img id="resource-image" class="eye__resourceimage" alt="" hidden />
+          <p id="resource-description"></p><div id="resource-meta" class="eye__meta"></div>
+          <a id="resource-source" class="eye__source" target="_blank" rel="noopener noreferrer" hidden>Source et attribution ↗</a>
+          <button id="open-media" class="eye__action" type="button" hidden>Ouvrir la photographie ↗</button>
+          <p id="media-caption" class="eye__mediacaption" role="status"></p>
+        </div>
+        <div id="local-results" class="eye__eventlist" aria-label="Ressources à proximité"></div>
+        <div class="eye__sectionlabel">IMAGERIE SATELLITE DATÉE</div>
+        <label class="eye__date">Jour du produit (UTC)<input id="imagery-day" type="date" /></label>
+        <button id="open-imagery" class="eye__action" type="button">Ouvrir l’image NASA VIIRS ↗</button>
+        <p class="eye__hint">Mosaïque quotidienne, environ 250 m/pixel. Nuages possibles ; pas de détail de rue.</p>
+      </section>
     </aside>
     <footer class="eye__footer"><span><span class="eye__footerdot"></span> CESIUMJS / MOTEUR GOD’S EYE VIEW</span><span id="foot-status">Aucune observation non vérifiée inventée</span><a href="https://github.com/bilawalsidhu/gods-eye-view" target="_blank" rel="noopener noreferrer">Attribution MIT · Bilawal Sidhu</a></footer>
     <div id="fatal" class="eye__fatal" hidden role="alert">Le moteur WebGL est indisponible sur cet appareil. Les observations restent accessibles dans les fiches et la liste.</div>

@@ -34,6 +34,7 @@ async function harness() {
     .replace(/^import .*\n/gm, '') + '\nglobalThis.hooks = { state, select, render, readData, fetchBoundedWarRoom };'
   const context = vm.createContext({
     document, window: {}, FEEDS, normalize, filterPoints,
+    createExplorer: () => ({ selectPlace() {}, attach() {}, pick() {} }),
     Cesium: { buildModuleUrl: { setBaseUrl() {} }, Viewer: class { constructor() { throw Error('NO_WEBGL_IN_UNIT_TEST') } } },
     fetch: async (...args) => {
       if (result instanceof Error) throw result

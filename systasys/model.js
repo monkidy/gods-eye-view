@@ -3,6 +3,7 @@
 export const FEEDS = Object.freeze({
   usgs_earthquakes_global_free: { label: 'USGS · Séismes', host: 'earthquake.usgs.gov', color: '#dfa76c', maxFreshMs: 60 * 60000 },
   gdacs_global_disasters_free: { label: 'GDACS · Catastrophes (interne)', host: 'www.gdacs.org', color: '#e68778', maxFreshMs: 120 * 60000 },
+  nasa_eonet_open_events_public: { label: 'NASA EONET · Événements ouverts', host: 'eonet.gsfc.nasa.gov', color: '#b3ce8b', maxFreshMs: 24 * 60 * 60000 },
 })
 const MAX_SCAN = 2000
 const MAX_POINTS = 300
@@ -63,13 +64,16 @@ export function normalize(payload, now = Date.now()) {
     if (!id || seen.has(id)) continue
     const url = safeSource(raw, feed)
     if (!url) continue
-    const actualFresh = raw.freshness === 'FRESH' && safeNow - ts <= feed.maxFreshMs
+    const published = utcTimestamp(raw.published_at_utc)
+    const eventAge = raw.source_id === 'nasa_eonet_open_events_public' ? safeNow - published : safeNow - ts
+    const actualFresh = raw.freshness === 'FRESH' && Number.isFinite(eventAge) && eventAge >= -60000 && eventAge <= feed.maxFreshMs
     const freshness = actualFresh ? 'FRESH' : 'AGEING'
     seen.add(id)
     points.push({
       id, lat: geo.lat, lon: geo.lon, at: raw.observed_at_utc,
       title: safe(raw.headline) || 'Observation publiée', source: raw.source_id,
       receipt: safe(raw.receipt_id, 160), freshness, url,
+      publishedAt: Number.isFinite(published) && published <= safeNow + 60000 ? raw.published_at_utc : null,
     })
     if (points.length >= MAX_POINTS) break
   }
