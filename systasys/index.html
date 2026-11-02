@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d141a" />
+  <title>World’s Eye · SYSTASYS</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="eye" id="eye-app">
+    <div id="globe" class="eye__globe" aria-label="Globe tridimensionnel CesiumJS"></div>
+    <div class="eye__vignette" aria-hidden="true"></div>
+    <header class="eye__masthead">
+      <div class="eye__brand"><span class="eye__monogram">S</span><span><small>SYSTASYS / INTELLIGENCE GÉOSPATIALE</small><strong>World’s Eye</strong></span></div>
+      <div class="eye__connection"><span class="eye__pulse"></span><span id="connection">Connexion SPECTRA en attente</span></div>
+    </header>
+    <aside class="eye__rail" aria-label="Couches de renseignement">
+      <div class="eye__railheading">COUCHES ACTIVES <span id="layer-count">0</span></div>
+      <label class="eye__layer"><input id="layer-usgs" type="checkbox" checked /><span class="eye__dot eye__dot--usgs"></span><span>Séismes <small>USGS · données officielles</small></span><span id="count-usgs" class="eye__layercount">0</span></label>
+      <label class="eye__layer"><input id="layer-gdacs" type="checkbox" checked /><span class="eye__dot eye__dot--gdacs"></span><span>Catastrophes <small>GDACS · lecture interne</small></span><span id="count-gdacs" class="eye__layercount">0</span></label>
+      <div class="eye__sectionlabel">TEMPORALITÉ</div>
+      <div class="eye__segmented" role="group" aria-label="Fraîcheur des observations">
+        <button type="button" data-period="fresh" aria-pressed="true">Vérifié</button>
+        <button type="button" data-period="all" aria-pressed="false">Tout</button>
+        <button type="button" data-period="ageing" aria-pressed="false">Vieillissant</button>
+      </div>
+      <p class="eye__hint">Les observations vieillissantes ne sont jamais présentées comme des alertes fraîches.</p>
+      <div class="eye__sectionlabel">OBSERVATIONS</div>
+      <div class="eye__statlist">
+        <div><strong id="stat-visible">0</strong><span>Géolocalisées affichées</span></div>
+        <div><strong id="stat-total">—</strong><span>Éléments SPECTRA</span></div>
+        <div><strong id="stat-other">—</strong><span>Hors carte</span></div>
+      </div>
+      <button id="refresh" class="eye__action" type="button">Actualiser les observations <span>↗</span></button>
+    </aside>
+    <section class="eye__hud" aria-label="Navigation et informations">
+      <div class="eye__coords"><small>PLANÈTE TERRE</small><strong id="camera-position">Vue globale · 3D</strong></div>
+      <div class="eye__nav">
+        <button type="button" id="home" title="Vue terrestre globale" aria-label="Vue terrestre globale">⌖</button>
+        <button type="button" id="zoom-in" aria-label="Zoom avant">+</button>
+        <button type="button" id="zoom-out" aria-label="Zoom arrière">−</button>
+      </div>
+    </section>
+    <aside class="eye__inspector" aria-live="polite">
+      <div class="eye__inspectorkicker">ANALYSE / OBSERVATION</div>
+      <h2 id="event-title">La Terre, en contexte</h2>
+      <p id="event-body">Ouvre une couche ou sélectionne un événement pour examiner sa provenance, sa date et son état de preuve.</p>
+      <div id="event-meta" class="eye__meta"></div>
+      <a id="event-source" class="eye__source" target="_blank" rel="noopener noreferrer" hidden>Source officielle ↗</a>
+      <div id="event-list" class="eye__eventlist" aria-label="Observations affichées"></div>
+    </aside>
+    <footer class="eye__footer"><span><span class="eye__footerdot"></span> CESIUMJS / MOTEUR GOD’S EYE VIEW</span><span id="foot-status">Aucune observation non vérifiée inventée</span><a href="https://github.com/bilawalsidhu/gods-eye-view" target="_blank" rel="noopener noreferrer">Attribution MIT · Bilawal Sidhu</a></footer>
+    <div id="fatal" class="eye__fatal" hidden role="alert">Le moteur WebGL est indisponible sur cet appareil. Les observations restent accessibles dans les fiches et la liste.</div>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
