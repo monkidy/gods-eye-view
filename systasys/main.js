@@ -84,9 +84,13 @@ function render() {
     : 'Aucun point admissible dans cette sélection')
 }
 
+// On the actual N4 parent page, concurrent first-load traffic can delay a valid
+// same-origin SPECTRA response beyond 7 s. Keep one request, a hard timeout,
+// the 1 MiB body limit, and fail-closed semantics; never retry indefinitely.
+const WAR_ROOM_READ_TIMEOUT_MS = 30_000
 async function fetchBoundedWarRoom() {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 7000)
+  const timeout = setTimeout(() => controller.abort(), WAR_ROOM_READ_TIMEOUT_MS)
   try {
     const response = await fetch('/n4/api/asso/spectra/war-room', {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
