@@ -2,22 +2,76 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { normalize, filterPoints } from './model.js'
 const now = Date.parse('2026-11-02T15:00:00Z')
-const row = (change = {}) => ({
-  intel_id: 'us-123', source_id: 'usgs_earthquakes_global_free', proof_state: 'OBSERVED', has_receipt: true,
-  lat: 37.1, lon: -122.2, observed_at_utc: '2026-11-02T14:45:00Z',
-  headline: 'Séisme', freshness: 'FRESH', external_provenance_url: 'https://earthquake.usgs.gov/earthquakes/eventpage/us123', ...change,
+const usgs = (change = {}) => ({
+  intel_id: 'us-123', source_id: 'usgs_earthquakes_global_free', proof_state: 'OBSERVED',
+  receipt_id: 'receipt-238', geo: { kind: 'POINT', lat: 37.1, lon: -122.2 },
+  observed_at_utc: '2026-11-02T14:45:00Z', headline: 'Séisme',
+  freshness: 'FRESH', external_provenance_url: 'https://earthquake.usgs.gov/earthquakes/eventpage/us123',
+  ...change,
 })
-test('admit fresh observed official point', () => assert.equal(normalize({ items: [row()] }, now).points.length, 1))
-test('separate ageing from fresh, never fake live', () => {
-  const ageing = row({ freshness: 'AGEING' })
-  const { points } = normalize({ items: [ageing] }, now)
-  assert.equal(filterPoints(points, 'fresh').length, 0)
-  assert.equal(filterPoints(points, 'ageing').length, 1)
+const data = (...rows) => ({ intel_items: rows })
+test('read actual war-room intel_items and POINT WGS84 with receipt', () => {
+  const model = normalize(data(usgs()), now)
+  assert.equal(model.points.length, 1)
+  assert.equal(model.total, 1)
+  assert.equal(model.points[0].receipt, 'receipt-238')
 })
-test('reject unknown source, invalid location, stale beyond 7 days', () => {
-  for (const bad of [{ source_id: 'unknown' }, { lat: 98 }, { lon: Infinity }, { observed_at_utc: '2026-10-01T00:00:00Z' }, { proof_state: 'CANDIDATE' }, { has_receipt: false }]) assert.equal(normalize({ items: [row(bad)] }, now).points.length, 0)
+test('accept bounded nested war-room contract', () =>
+  assert.equal(normalize({ data: { intel_items: [usgs()] } }, now).points.length, 1))
+test('never treat has_receipt true as an actual receipt', () => {
+  assert.equal(normalize(data(usgs({ receipt_id: null, has_receipt: true })), now).points.length, 0)
 })
-test('reject URL host forgery and future observation', () => {
-  for (const bad of [{ external_provenance_url: 'https://earthquake.usgs.gov.evil.test/abc' }, { observed_at_utc: '2026-12-01T00:00:00Z' }]) assert.equal(normalize({ items: [row(bad)] }, now).points.length, 0)
+test('never infer a location from top-level lat/lon or a COUNTRY geometry', () => {
+  assert.equal(normalize(data(usgs({ geo: undefined, lat: 35, lon: 11 })), now).points.length, 0)
+  assert.equal(normalize(data(usgs({ geo: { kind: 'COUNTRY', lat: 35, lon: 11 } })), now).points.length, 0)
 })
-test('deduplication and no interpolation', () => assert.equal(normalize({ items: [row(), row(), row({ intel_id: 'x', lat: null })] }, now).points.length, 1))
+test('refuse all invalid coordinates and non-numeric coordinate strings', () => {
+  for (const [lat, lon] of [[95, 10], [0, -181], [null, 11], ['13', 42], [NaN, 0], [Infinity, 0]]) {
+    assert.equal(normalize(data(usgs({ geo: { kind: 'POINT', lat, lon } })), now).points.length, 0)
+  }
+})
+test('require observed proof state, receipt and official HTTPS provenance', () => {
+  for (const change of [
+    { source_id: 'unknown' }, { proof_state: 'PRODUCED' }, { receipt_id: '' },
+    { external_provenance_url: 'https://earthquake.usgs.gov.evil.invalid/data' },
+    { external_provenance_url: 'http://earthquake.usgs.gov/data' },
+    { external_provenance_url: 'https://user@earthquake.usgs.gov/path' },
+  ]) assert.equal(normalize(data(usgs(change)), now).points.length, 0)
+})
+test('reject future, malformed and older than seven days', () => {
+  for (const at of ['2026-12-01T10:00:00Z', '2026-11-02', '2026-10-01T00:00:00Z']) {
+    assert.equal(normalize(data(usgs({ observed_at_utc: at })), now).points.length, 0)
+  }
+})
+test('downgrade stale reported FRESH; never upgrade AGEING', () => {
+  const tooOldForFresh = usgs({ observed_at_utc: '2026-11-02T12:00:00Z' })
+  const ageing = usgs({ intel_id: 'older', freshness: 'AGEING' })
+  const model = normalize(data(tooOldForFresh, ageing), now)
+  assert.deepEqual(model.points.map(p => p.freshness), ['AGEING', 'AGEING'])
+  assert.equal(filterPoints(model.points, 'fresh').length, 0)
+})
+test('GDACS internal feed accepted with its own host, but never exported', () => {
+  const gdacs = usgs({
+    source_id: 'gdacs_global_disasters_free',
+    external_provenance_url: 'https://www.gdacs.org/report/123',
+  })
+  assert.equal(normalize(data(gdacs), now).points.length, 1)
+  assert.equal(normalize(data(gdacs), now).points[0].source, 'gdacs_global_disasters_free')
+})
+test('deduplicate IDs and filter by enabled layers', () => {
+  const points = normalize(data(usgs(), usgs(), usgs({ intel_id: 'other' })), now).points
+  assert.equal(points.length, 2)
+  assert.equal(filterPoints(points, 'all', new Set(['gdacs_global_disasters_free'])).length, 0)
+})
+test('bounded scan and point caps with truthful truncated marker', () => {
+  const rows = Array.from({ length: 2401 }, (_, i) => usgs({ intel_id: 'us-' + i }))
+  const model = normalize(data(...rows), now)
+  assert.equal(model.total, 2401)
+  assert.ok(model.points.length <= 300)
+  assert.equal(model.truncated, true)
+})
+test('sanitize headlines and keep sources linked to official hosts', () => {
+  const model = normalize(data(usgs({ headline: 'Event\u0000\u0007 important' })), now)
+  assert.equal(model.points[0].title, 'Event   important')
+  assert.ok(model.points[0].url.startsWith('https://earthquake.usgs.gov/'))
+})
