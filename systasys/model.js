@@ -9,7 +9,19 @@ const MAX_POINTS = 300
 const MAX_VISIBLE_MS = 7 * 86400000
 const safe = (value, size = 240) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, size) : ''
 const finiteCoordinate = (v, low, high) => typeof v === 'number' && Number.isFinite(v) && v >= low && v <= high
-const isoUtc = v => typeof v === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(v)
+function utcTimestamp(value) {
+  const parts = typeof value === 'string' && /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d+))?Z$/.exec(value)
+  if (!parts) return NaN
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return NaN
+  const date = new Date(timestamp)
+  // Date.parse normalizes impossible dates such as February 31. A date-shaped
+  // string is not evidence of a real UTC calendar instant.
+  const actual = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(),
+    date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds()]
+  if (actual.some((part, index) => part !== Number(parts[index + 1]))) return NaN
+  return timestamp
+}
 
 function rowsFrom(payload) {
   if (!payload || typeof payload !== 'object') return []
@@ -41,11 +53,11 @@ export function normalize(payload, now = Date.now()) {
     const feed = FEEDS[raw.source_id]
     // A boolean "has_receipt" is NOT a receipt. An observed record needs its actual receipt ID.
     if (raw.proof_state !== 'OBSERVED' || !safe(raw.receipt_id, 160)) continue
-    if (!['FRESH', 'AGEING', 'STALE'].includes(raw.freshness)) continue
+    // Never promote an upstream rejection (STALE/unknown) into visible history.
+    if (!['FRESH', 'AGEING'].includes(raw.freshness)) continue
     const geo = raw.geo || raw.geography
     if (!geo || geo.kind !== 'POINT' || !finiteCoordinate(geo.lat, -90, 90) || !finiteCoordinate(geo.lon, -180, 180)) continue
-    if (!isoUtc(raw.observed_at_utc)) continue
-    const ts = Date.parse(raw.observed_at_utc)
+    const ts = utcTimestamp(raw.observed_at_utc)
     if (!Number.isFinite(ts) || ts > safeNow + 60000 || safeNow - ts > MAX_VISIBLE_MS) continue
     const id = safe(raw.intel_id, 120)
     if (!id || seen.has(id)) continue

@@ -7,12 +7,21 @@ import './style.css'
 const ROOT = '/n4/worlds-eye-app/'
 Cesium.buildModuleUrl.setBaseUrl(ROOT + 'cesium/')
 const $ = id => document.getElementById(id)
-const state = { points: [], enabled: new Set(Object.keys(FEEDS)), period: 'fresh', viewer: null, inFlight: false }
+const state = { points: [], enabled: new Set(Object.keys(FEEDS)), period: 'fresh', viewer: null, inFlight: false, selectedId: null }
 const fmt = at => new Date(at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC'
 const status = message => { $('connection').textContent = message }
 const geoStatus = message => { $('foot-status').textContent = message }
 
-function select(item) {
+function clearSelection() {
+  state.selectedId = null
+  $('event-title').textContent = 'La Terre, en contexte'
+  $('event-body').textContent = 'Sélectionne une observation affichée pour examiner sa provenance, sa date et son état de preuve.'
+  $('event-meta').textContent = ''
+  $('event-source').hidden = true
+  $('event-source').removeAttribute('href')
+}
+
+function renderSelection(item) {
   $('event-title').textContent = item.title
   $('event-body').textContent = item.freshness === 'FRESH'
     ? 'Observation officielle récente avec reçu SPECTRA.'
@@ -21,13 +30,25 @@ function select(item) {
     item.freshness + ' · reçu ' + item.receipt
   $('event-source').hidden = false
   $('event-source').href = item.url
+}
+
+function select(item) {
+  const current = filterPoints(state.points, state.period, state.enabled).find(point => point.id === item?.id)
+  if (!current) return clearSelection()
+  state.selectedId = current.id
+  renderSelection(current)
   if (state.viewer) state.viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(item.lon, item.lat, 1800000), duration: 1.1,
+    destination: Cesium.Cartesian3.fromDegrees(current.lon, current.lat, 1800000), duration: 1.1,
   })
 }
 
 function render() {
   const filtered = filterPoints(state.points, state.period, state.enabled)
+  // A selected receipt is valid only while its current record remains visible.
+  // Re-read its fields after refresh; do not leave an earlier FRESH label behind.
+  const selected = filtered.find(item => item.id === state.selectedId)
+  if (selected) renderSelection(selected)
+  else clearSelection()
   $('stat-visible').textContent = String(filtered.length)
   $('layer-count').textContent = String(state.enabled.size)
   $('count-usgs').textContent = String(state.points.filter(p => p.source === 'usgs_earthquakes_global_free').length)
@@ -85,12 +106,20 @@ async function fetchBoundedWarRoom() {
         if (totalBytes > 1048576) throw Error('OVER_SIZE')
         chunks.push(value)
       }
+    } catch (error) {
+      // Releasing a lock alone leaves the upstream response streaming. Refuse
+      // oversized/failed bodies and cancel their producer before returning.
+      try { await reader.cancel() } catch { /* preserve the original refusal */ }
+      throw error
     } finally { reader.releaseLock() }
     const bytes = new Uint8Array(totalBytes)
     let offset = 0
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
-  } finally { clearTimeout(timeout) }
+  } finally {
+    clearTimeout(timeout)
+    controller.abort()
+  }
 }
 async function readData() {
   if (state.inFlight) return

@@ -50,6 +50,28 @@ test('downgrade stale reported FRESH; never upgrade AGEING', () => {
   assert.deepEqual(model.points.map(p => p.freshness), ['AGEING', 'AGEING'])
   assert.equal(filterPoints(model.points, 'fresh').length, 0)
 })
+test('refuse upstream STALE and unknown states even with a recent valid receipt', () => {
+  for (const freshness of ['STALE', 'UNKNOWN', 'ACTIVE', '', null]) {
+    const points = normalize(data(usgs({ freshness })), now).points
+    assert.equal(points.length, 0)
+    assert.equal(filterPoints(points, 'all').length, 0)
+  }
+})
+test('require a real UTC calendar date, including leap-year rules', () => {
+  for (const [at, clock] of [
+    ['2026-02-31T12:00:00Z', '2026-03-03T12:10:00Z'],
+    ['2026-02-29T12:00:00Z', '2026-03-01T12:10:00Z'],
+    ['2024-04-31T12:00:00Z', '2024-05-01T12:10:00Z'],
+    ['2024-02-29T24:00:00Z', '2024-03-01T00:10:00Z'],
+  ]) {
+    assert.equal(normalize(data(usgs({ observed_at_utc: at })), Date.parse(clock)).points.length, 0, at)
+  }
+  for (const at of ['2024-02-29T12:00:00Z', '2024-02-29T12:00:00.125Z']) {
+    const points = normalize(data(usgs({ observed_at_utc: at })), Date.parse('2024-02-29T12:10:00Z')).points
+    assert.equal(points.length, 1, at)
+    assert.equal(points[0].freshness, 'FRESH')
+  }
+})
 test('GDACS internal feed accepted with its own host, but never exported', () => {
   const gdacs = usgs({
     source_id: 'gdacs_global_disasters_free',
