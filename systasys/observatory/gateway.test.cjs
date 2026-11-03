@@ -241,9 +241,20 @@ test('disconnect cancels in-flight reads and frees the bounded queue', async (t)
   );
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.ok(peak <= 4 && peak > 0);
-  assert.equal((await fetch(base + '/api/health')).status, 429);
+  let healthResolved = false;
+  const waitingHealth = fetch(base + '/api/health').then((r) => {
+    healthResolved = true;
+    return r;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(
+    healthResolved,
+    false,
+    'response admission waits behind the eight active reads',
+  );
   controllers.forEach((c) => c.abort());
   await Promise.all(pending);
+  assert.equal((await waitingHealth).status, 200);
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(active, 0);
   const health = await (await fetch(base + '/api/health')).json();
@@ -350,7 +361,7 @@ test(
 
 async function until(check) {
   const deadline = performance.now() + 3000;
-  while (!check()) {
+  while (!(await check())) {
     assert.ok(performance.now() < deadline, 'request admission deadline');
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -393,7 +404,10 @@ test('a burst of one-shot worker imports waits behind eight active reads without
     'waiting response work cannot start extra upstream reads',
   );
   unblock();
-  for (const r of await Promise.all(held)) assert.equal(r.status, 200);
+  for (const r of await Promise.all(held)) {
+    assert.equal(r.status, 200);
+    await r.text();
+  }
   for (const r of await Promise.all(reads)) {
     assert.equal(
       r.status,
@@ -441,8 +455,15 @@ test('the response wait queue stays bounded and cancelled waiters retain no perm
   controllers.forEach((c) => c.abort());
   assert.ok((await queued).every((r) => r.status === 'rejected'));
   unblock();
-  for (const r of await Promise.all(held)) assert.equal(r.status, 200);
-  const h = await (await fetch(base + '/api/health')).json();
+  for (const r of await Promise.all(held)) {
+    assert.equal(r.status, 200);
+    await r.text();
+  }
+  let h;
+  await until(async () => {
+    h = await (await fetch(base + '/api/health')).json();
+    return h.active_responses === 1 && h.queued_responses === 0;
+  });
   assert.equal(h.active, 0);
   assert.equal(h.queued, 0);
   assert.equal(h.active_responses, 1);
