@@ -375,6 +375,7 @@ async function cityData() {
       state.terrainReady = true;
       viewer.scene.requestRender();
     } catch {
+      if (viewer !== state.viewer) return;
       $('data-state').textContent =
         'Relief indisponible · la surface plane n’est pas un relief prouvé';
     }
@@ -476,6 +477,7 @@ async function boot() {
   state.tiles = null;
   $('fallback').hidden = true;
   $('approach').disabled = false;
+  $('discover').disabled = false;
   try {
     const viewer = new C.Viewer('globe', {
       baseLayer: false,
