@@ -35,8 +35,23 @@ const state = {
   objectUrl: null,
   guard: null,
   paused: false,
+  pilotDataState: 'Lecture des références',
   life: new AbortController(),
 };
+function inPilot(point) {
+  return (
+    point.lon >= PILOT.bounds[0] &&
+    point.lon <= PILOT.bounds[2] &&
+    point.lat >= PILOT.bounds[1] &&
+    point.lat <= PILOT.bounds[3]
+  );
+}
+function showDataState(message = state.pilotDataState) {
+  state.pilotDataState = message;
+  $('data-state').textContent = inPilot(state.point)
+    ? message
+    : 'Hors de la zone pilote · fond mondial de référence';
+}
 const text = (tag, value, cls) => {
   const e = document.createElement(tag);
   e.textContent = value;
@@ -121,12 +136,10 @@ async function references() {
     )
       throw Error('PILOT');
     if (life !== state.life || life.signal.aborted) return;
-    $('data-state').textContent =
-      'Références officielles · géométrie inchangée';
+    showDataState('Références officielles · géométrie inchangée');
   } catch {
     if (life !== state.life || life.signal.aborted) return;
-    $('data-state').textContent =
-      'Références indisponibles · aucune validation affirmée';
+    showDataState('Références indisponibles · aucune validation affirmée');
   }
 }
 function clearImage() {
@@ -318,11 +331,15 @@ function selectPlace(
   $('place-coordinates').textContent =
     `${point.lat.toFixed(5)}° · ${point.lon.toFixed(5)}°`;
   if (reveal) drawer(true);
-  const inside =
-    point.lon >= PILOT.bounds[0] &&
-    point.lon <= PILOT.bounds[2] &&
-    point.lat >= PILOT.bounds[1] &&
-    point.lat <= PILOT.bounds[3];
+  const inside = inPilot(point);
+  showDataState();
+  $('scene-kicker').textContent = inside
+    ? 'ESPACE → VILLE → LIEU'
+    : 'LIEU SÉLECTIONNÉ';
+  $('scene-title').textContent = inside ? 'Genève' : title;
+  $('scene-description').textContent = inside
+    ? 'Relief, volumes et orthophotographie de référence. Sélectionner un point pour en lire les sources.'
+    : 'Fond mondial de référence. Aucune couverture 3D détaillée affirmée ici ; consulter les ressources locales disponibles.';
   document.querySelectorAll('.reference-card').forEach((card) => {
     card.hidden = !inside;
   });
@@ -389,8 +406,9 @@ async function cityData() {
       viewer.scene.requestRender();
     } catch {
       if (viewer !== state.viewer) return;
-      $('data-state').textContent =
-        'Relief indisponible · la surface plane n’est pas un relief prouvé';
+      showDataState(
+        'Relief indisponible · la surface plane n’est pas un relief prouvé',
+      );
     }
   }
   if (!state.tiles) {
@@ -413,24 +431,26 @@ async function cityData() {
     tiles.tileFailed.addEventListener(() => {
       if (viewer !== state.viewer) return;
       state.tileErrors++;
-      $('data-state').textContent =
-        'Couverture 3D partielle · des bâtiments n’ont pas répondu';
+      showDataState(
+        'Couverture 3D partielle · des bâtiments n’ont pas répondu',
+      );
     });
     tiles.loadProgress.addEventListener((pending, processing) => {
       if (viewer !== state.viewer) return;
-      $('data-state').textContent = state.tileErrors
-        ? 'Couverture 3D partielle · des bâtiments n’ont pas répondu'
-        : pending || processing
-          ? `Genève · chargement des volumes (${pending + processing})`
-          : state.terrainReady
-            ? 'Genève · bâtiments officiels et relief de référence'
-            : 'Bâtiments officiels · relief indisponible';
+      showDataState(
+        state.tileErrors
+          ? 'Couverture 3D partielle · des bâtiments n’ont pas répondu'
+          : pending || processing
+            ? `Genève · chargement des volumes (${pending + processing})`
+            : state.terrainReady
+              ? 'Genève · bâtiments officiels et relief de référence'
+              : 'Bâtiments officiels · relief indisponible',
+      );
     });
     viewer.scene.requestRender();
   }
   if (viewer === state.viewer && state.tiles)
-    $('data-state').textContent =
-      'Genève · géométrie officielle en cours de chargement';
+    showDataState('Genève · géométrie officielle en cours de chargement');
 }
 async function approach() {
   const viewer = state.viewer;
@@ -448,8 +468,9 @@ async function approach() {
     // Load detailed geometry at arrival, avoiding tiles for intermediate altitudes.
     await Promise.resolve();
   } catch {
-    $('data-state').textContent =
-      'Modèle 3D indisponible · aucune géométrie de remplacement affirmée';
+    showDataState(
+      'Modèle 3D indisponible · aucune géométrie de remplacement affirmée',
+    );
   }
   if (viewer !== state.viewer || flight !== state.flightGeneration) return;
   viewer.camera.flyToBoundingSphere(
@@ -471,14 +492,14 @@ async function approach() {
         $('approach').disabled = false;
         $('approach').firstChild.textContent = 'Recentrer Genève ';
         selectPlace(PILOT, 'Genève', true, null, !mobile);
-        $('data-state').textContent =
-          'Chargement du relief et des bâtiments officiels';
+        showDataState('Chargement du relief et des bâtiments officiels');
         try {
           await cityData();
         } catch {
           if (viewer === state.viewer)
-            $('data-state').textContent =
-              'Bâtiments indisponibles · aucune géométrie de remplacement affirmée';
+            showDataState(
+              'Bâtiments indisponibles · aucune géométrie de remplacement affirmée',
+            );
         }
       },
       cancel: () => {
