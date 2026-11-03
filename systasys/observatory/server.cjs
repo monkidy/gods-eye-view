@@ -110,6 +110,8 @@ function createGateway({
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, 'MANIFEST.json')),
   );
+  const staticManifestSha = hash(fs.readFileSync(path.join(root, 'MANIFEST.json')));
+  const gatewaySha = hash(fs.readFileSync(__filename));
   const derivation = JSON.parse(
     fs.readFileSync(path.join(root, 'pilot/buildings/SOURCE_RECEIPT.json')),
   );
@@ -356,6 +358,12 @@ function createGateway({
       if (p === '/api/health' && !url.search)
         return await json({
           schema: 'WORLDS_EYE_OBSERVATORY_HEALTH_V2',
+          source_repository: 'monkidy/gods-eye-view',
+          source_sha: manifest.source_sha,
+          static_manifest_sha256: staticManifestSha,
+          gateway_sha256: gatewaySha,
+          build_scope: manifest.build_scope,
+          working_tree_dirty: manifest.working_tree_dirty,
           read_only: true,
           pid: process.pid,
           uptime_seconds: Math.floor((Date.now() - started) / 1000),
