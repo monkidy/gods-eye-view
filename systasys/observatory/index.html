@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>World’s Eye — observatoire géospatial</title>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="/" aria-label="World’s Eye, vue mondiale"
+        ><span class="mark" aria-hidden="true">◉</span> WORLD’S EYE
+        <span class="edition">OBSERVATOIRE GÉOSPATIAL</span></a
+      >
+      <nav aria-label="Observatoire">
+        <button id="quality" class="quiet" aria-pressed="false">
+          Qualité légère</button
+        ><button
+          id="sources-toggle"
+          class="quiet"
+          aria-controls="evidence"
+          aria-expanded="true"
+        >
+          Sources</button
+        ><a id="back-asso" class="back" rel="noopener noreferrer">Asso ↗</a>
+      </nav>
+    </header>
+    <main>
+      <section class="world" aria-label="Globe et zone pilote de Genève">
+        <div id="globe"></div>
+        <div class="topline">
+          <span class="tag">GENÈVE · ZONE PILOTE</span
+          ><span id="data-state" role="status">Lecture des références</span>
+        </div>
+        <div id="fallback" hidden>
+          <h2>Vue documentaire</h2>
+          <p>
+            Le globe 3D n’est pas disponible dans ce navigateur. Les sources
+            restent consultables.
+          </p>
+        </div>
+        <div id="pause" hidden>
+          <h2>L’observation est en pause</h2>
+          <p>La scène et ses lectures sont arrêtées.</p>
+          <button id="resume">Reprendre l’observation</button>
+        </div>
+        <div class="scene-caption">
+          <p class="eyebrow" id="scene-kicker">DEPUIS L’ORBITE</p>
+          <h1 id="scene-title">Le monde,<br /><em>à hauteur de lieu.</em></h1>
+          <p id="scene-description">
+            Approcher Genève, lire son relief et ses bâtiments, puis examiner
+            les sources disponibles.
+          </p>
+          <div class="approach">
+            <button id="approach" class="primary">
+              Approcher Genève <span aria-hidden="true">↘</span></button
+            ><button
+              id="orbit"
+              class="round"
+              aria-label="Revenir à la vue orbitale"
+            >
+              ◎
+            </button>
+          </div>
+        </div>
+        <div class="map-controls">
+          <button id="zoom-in" aria-label="Rapprocher la vue">＋</button
+          ><button id="zoom-out" aria-label="Éloigner la vue">−</button
+          ><button
+            id="open-place"
+            aria-controls="evidence"
+            aria-label="Voir les détails du lieu"
+          >
+            ⌖
+          </button>
+        </div>
+        <div class="reference-note">
+          MODÈLE DE RÉFÉRENCE · PAS UNE VUE EN DIRECT
+          <span>©swisstopo · CesiumJS</span>
+        </div>
+      </section>
+      <aside id="evidence" aria-label="Lieu et preuves">
+        <div class="drawer-heading">
+          <p class="eyebrow">LE LIEU, SES SOURCES</p>
+          <button
+            id="sources-close"
+            class="quiet close"
+            aria-label="Fermer les sources"
+          >
+            ×
+          </button>
+        </div>
+        <h2 id="place-title">Genève</h2>
+        <p id="place-coordinates" class="coordinates">
+          46.20190° N · 6.14870° E
+        </p>
+        <p class="place-intro">
+          Une maquette officielle, des images de référence et les observations
+          effectivement disponibles.
+        </p>
+        <section class="reference-card">
+          <div class="card-top">
+            <span class="source-number">01</span
+            ><span class="source-kind">GÉOMÉTRIE CARTOGRAPHIÉE</span>
+          </div>
+          <h3>Bâtiments & relief</h3>
+          <p>
+            Toitures et volumes officiels. Géométrie d’origine, sans bâtiments
+            inventés.
+          </p>
+          <dl>
+            <div>
+              <dt>Bâtiments</dt>
+              <dd>Publication · 20 mai 2026</dd>
+            </div>
+            <div>
+              <dt>Relief</dt>
+              <dd>Publication · janvier 2025</dd>
+            </div>
+            <div>
+              <dt>Couverture</dt>
+              <dd>Zone pilote de Genève</dd>
+            </div>
+          </dl>
+          <a
+            href="https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Source & conditions · swisstopo ↗</a
+          >
+        </section>
+        <section class="reference-card">
+          <div class="card-top">
+            <span class="source-number">02</span
+            ><span class="source-kind">IMAGE DE RÉFÉRENCE</span>
+          </div>
+          <h3>Le territoire vu du ciel</h3>
+          <p>
+            Orthophotographie SWISSIMAGE. Date précise de prise de vue non
+            fournie par cette tuile ; ce fond n’est pas un direct.
+          </p>
+          <a
+            href="https://www.swisstopo.admin.ch/en/orthoimage-swissimage"
+            target="_blank"
+            rel="noopener noreferrer"
+            >©swisstopo · consulter le produit ↗</a
+          >
+        </section>
+        <section id="event-evidence" hidden>
+          <h3>Observation sélectionnée</h3>
+          <p id="event-proof"></p>
+          <a id="event-source" target="_blank" rel="noopener noreferrer"
+            >Ouvrir la source officielle ↗</a
+          >
+        </section>
+        <section class="local-section">
+          <div class="section-heading">
+            <h3>Autour de ce point</h3>
+            <button id="discover" class="quiet">Rechercher</button>
+          </div>
+          <p id="local-status" role="status">
+            Recherche à la demande · rayon de 10 km. Les images s’ouvrent
+            uniquement après sélection.
+          </p>
+          <div class="place-inputs">
+            <label
+              >Latitude<input
+                id="place-lat"
+                type="number"
+                min="-90"
+                max="90"
+                step="any"
+                value="46.20190" /></label
+            ><label
+              >Longitude<input
+                id="place-lon"
+                type="number"
+                min="-180"
+                max="180"
+                step="any"
+                value="6.14870" /></label
+            ><button id="go-place" type="button">
+              Explorer ces coordonnées
+            </button>
+          </div>
+          <div id="local-list"></div>
+          <article id="media-card" hidden>
+            <h4 id="media-title"></h4>
+            <p id="media-meta"></p>
+            <p id="media-proof"></p>
+            <a
+              id="media-source"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+              >Source originale ↗</a
+            >
+            <button id="open-media" class="primary">
+              Ouvrir la photographie</button
+            ><img id="resource-image" alt="" hidden />
+            <p id="media-result" role="status"></p>
+          </article>
+        </section>
+        <section class="world-section">
+          <div class="section-heading">
+            <h3>Événements documentés</h3>
+            <button id="refresh" class="quiet">Actualiser</button>
+          </div>
+          <p id="observations-status" role="status">
+            SPECTRA · lecture non encore obtenue
+          </p>
+          <div id="event-list"></div>
+          <p class="small-note">
+            La présence simultanée de plusieurs observations ne démontre pas un
+            lien causal. Une source absente reste inconnue.
+          </p>
+        </section>
+        <p class="credits">
+          CesiumJS · moteur God’s Eye View / Bilawal Sidhu (MIT)<br />©swisstopo
+          · sources publiques et reçus SPECTRA
+        </p>
+      </aside>
+    </main>
+    <footer class="timebar">
+      <div>
+        <span class="eyebrow">FENÊTRE DES ÉVÉNEMENTS</span
+        ><span class="time-note"
+          >Les modèles et photographies conservent leur propre date.</span
+        >
+      </div>
+      <label for="event-day" class="sr-only"
+        >Jour des événements disponibles</label
+      ><input id="event-day" type="date" /><span id="event-count"
+        >— observation</span
+      ><button id="show-all" class="quiet" aria-pressed="true">
+        Sept jours
+      </button>
+    </footer>
+    <noscript
+      >JavaScript est nécessaire au globe. Les références officielles sont
+      accessibles dans le panneau des sources.</noscript
+    >
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

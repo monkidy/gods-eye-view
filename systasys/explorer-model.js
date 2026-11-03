@@ -25,11 +25,14 @@ export function satellitePosition(item, at = new Date()) {
 }
 // One bounded same-origin request. No streaming media, upstream URL, auth
 // token, automatic retry or third-party browser connection is accepted.
-export async function readResource(params, binary = false) {
+export async function readResource(params, binary = false, { observatory = false, signal } = {}) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000)
+  const abort = () => controller.abort()
+  signal?.addEventListener('abort', abort, { once: true })
   let reader
   try {
-    const response = await fetch(RESOURCE_ROUTE + '?' + new URLSearchParams(params), {
+    if (signal?.aborted) throw Error('REQUEST_CANCELLED')
+    const response = await fetch((observatory ? '/api/resources' : RESOURCE_ROUTE) + '?' + new URLSearchParams(params), {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal,
       headers: { Accept: binary ? 'image/png,image/jpeg' : 'application/json' },
     })
@@ -63,6 +66,7 @@ export async function readResource(params, binary = false) {
     if (value.schema !== 'SPECTRA_GEOGRAPHIC_RESOURCE_RESPONSE_V1' || value.authority?.read_only !== true || value.authority?.background_collection !== false) throw Error('RESPONSE_AUTHORITY_REFUSED')
     return value
   } finally {
+    signal?.removeEventListener('abort', abort)
     clearTimeout(timer); controller.abort()
     if (reader) { try { Promise.resolve(reader.cancel()).catch(() => {}) } catch {} }
   }
