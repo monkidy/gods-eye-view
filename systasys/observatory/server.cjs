@@ -154,9 +154,41 @@ function createGateway({
     sourceRequests = [],
     outputAt = 0;
   const queue = [],
+    responseQueue = [],
     cache = new Map(),
     started = Date.now();
   const counters = { upstream_reads: 0, served_bytes: 0, refused_reads: 0 };
+  async function responsePermit(signal) {
+    signal.throwIfAborted();
+    if (responses < 8) {
+      responses++;
+      return;
+    }
+    if (responseQueue.length >= 32) throw new Refusal('RESPONSE_BUDGET', 429);
+    // HTTP/2 can deliver a burst of one-shot Cesium worker imports. Waiting
+    // keeps those imports intact without increasing active work. The request
+    // deadline below also bounds this wait; disconnect removes it immediately.
+    await new Promise((resolve, reject) => {
+      const item = {
+        done: () => {
+          signal.removeEventListener('abort', abort);
+          resolve();
+        },
+      };
+      const abort = () => {
+        const at = responseQueue.indexOf(item);
+        if (at >= 0) responseQueue.splice(at, 1);
+        reject(new Refusal('CANCELLED', 499));
+      };
+      signal.addEventListener('abort', abort, { once: true });
+      responseQueue.push(item);
+    });
+  }
+  function releaseResponse() {
+    const next = responseQueue.shift();
+    if (next) next.done();
+    else responses--;
+  }
   async function permit(signal) {
     signal.throwIfAborted();
     if (active < 4) {
@@ -341,23 +373,14 @@ function createGateway({
       'X-Frame-Options': 'DENY',
     }))
       res.setHeader(k, v);
-    if (responses >= 8) {
-      counters.refused_reads++;
-      res.writeHead(429, {
-        'Content-Type': 'application/json',
-        'Retry-After': '2',
-        'Cache-Control': 'no-store',
-      });
-      return res.end(
-        JSON.stringify({ error: 'RESPONSE_BUDGET', read_only: true }),
-      );
-    }
-    responses++;
+    let responseAdmitted = false;
     const deadline = setTimeout(() => {
       controller.abort();
       res.destroy();
     }, 35000);
     try {
+      await responsePermit(signal);
+      responseAdmitted = true;
       if (req.method !== 'GET')
         throw new Refusal('READ_ONLY_GET_REQUIRED', 405);
       const url = new URL(req.url, 'http://127.0.0.1'),
@@ -383,6 +406,7 @@ function createGateway({
           uptime_seconds: Math.floor((Date.now() - started) / 1000),
           active,
           active_responses: responses,
+          queued_responses: responseQueue.length,
           queued: queue.length,
           cache_bytes: cacheBytes,
           ...counters,
@@ -523,6 +547,9 @@ function createGateway({
       res.writeHead(e instanceof Refusal ? e.status : 503, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
+        ...(e instanceof Refusal && e.status === 429
+          ? { 'Retry-After': '2' }
+          : {}),
       });
       res.end(
         JSON.stringify({
@@ -533,7 +560,7 @@ function createGateway({
     } finally {
       clearTimeout(deadline);
       controller.abort();
-      responses--;
+      if (responseAdmitted) releaseResponse();
     }
   });
   server.requestTimeout = 30000;

@@ -27,20 +27,28 @@ async function fixture(
   const html = Buffer.from(
     '<!doctype html><title>isolated proof fixture</title>',
   );
-  fs.writeFileSync(path.join(root, 'index.html'), html);
+  const { fixtureFiles = {}, ...gatewayOptions } = options;
+  const files = { 'index.html': html, ...fixtureFiles };
+  const entries = {};
+  for (const [name, value] of Object.entries(files)) {
+    const bytes = Buffer.from(value);
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+    fs.writeFileSync(path.join(root, name), bytes);
+    entries[name] = { size: bytes.length, sha256: sha(bytes) };
+  }
   fs.writeFileSync(
     path.join(root, 'MANIFEST.json'),
     JSON.stringify({
       schema: 'SYSTASYS_WORLDS_EYE_OBSERVATORY_BUNDLE_V2',
       source_sha: 'a'.repeat(40),
-      entries: { 'index.html': { size: html.length, sha256: sha(html) } },
+      entries,
     }),
   );
   const server = createGateway({
     root,
     fetchImpl,
     normalize: () => ({ points: [], total: 1 }),
-    ...options,
+    ...gatewayOptions,
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
@@ -339,3 +347,104 @@ test(
     );
   },
 );
+
+async function until(check) {
+  const deadline = performance.now() + 3000;
+  while (!check()) {
+    assert.ok(performance.now() < deadline, 'request admission deadline');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+test('a burst of one-shot worker imports waits behind eight active reads without losing modules', async (t) => {
+  let unblock;
+  const blocked = new Promise((resolve) => {
+    unblock = resolve;
+  });
+  let upstream = 0,
+    arrivals = 0,
+    imports = 0;
+  const worker = Buffer.from('export const decoder = "real static bytes";');
+  const { base, server } = await fixture(
+    t,
+    async () => {
+      upstream++;
+      await blocked;
+      return new Response('{}', {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    { fixtureFiles: { 'cesium/Workers/decodeDraco.js': worker } },
+  );
+  server.on('request', (req) => {
+    if (req.url === '/api/observations') arrivals++;
+    if (req.url === '/cesium/Workers/decodeDraco.js') imports++;
+  });
+  const held = Array.from({ length: 8 }, () =>
+    fetch(base + '/api/observations'),
+  );
+  await until(() => arrivals === 8 && upstream === 4);
+  const reads = Array.from({ length: 24 }, () =>
+    fetch(base + '/cesium/Workers/decodeDraco.js'),
+  );
+  await until(() => imports === 24);
+  assert.equal(
+    upstream,
+    4,
+    'waiting response work cannot start extra upstream reads',
+  );
+  unblock();
+  for (const r of await Promise.all(held)) assert.equal(r.status, 200);
+  for (const r of await Promise.all(reads)) {
+    assert.equal(
+      r.status,
+      200,
+      'a one-shot module cannot recover from HTTP429',
+    );
+    assert.deepEqual(Buffer.from(await r.arrayBuffer()), worker);
+  }
+  const h = await (await fetch(base + '/api/health')).json();
+  assert.equal(h.active, 0);
+  assert.equal(h.active_responses, 1);
+  assert.equal(h.queued_responses, 0);
+});
+test('the response wait queue stays bounded and cancelled waiters retain no permits', async (t) => {
+  let unblock;
+  const blocked = new Promise((resolve) => {
+    unblock = resolve;
+  });
+  let upstream = 0,
+    arrivals = 0,
+    waiting = 0;
+  const { base, server } = await fixture(t, async () => {
+    upstream++;
+    await blocked;
+    return new Response('{}', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  server.on('request', (req) => {
+    if (req.url === '/api/observations') arrivals++;
+    if (req.url === '/') waiting++;
+  });
+  const held = Array.from({ length: 8 }, () =>
+    fetch(base + '/api/observations'),
+  );
+  await until(() => arrivals === 8 && upstream === 4);
+  const controllers = Array.from({ length: 32 }, () => new AbortController());
+  const queued = Promise.allSettled(
+    controllers.map((c) => fetch(base + '/', { signal: c.signal })),
+  );
+  await until(() => waiting === 32);
+  const overflow = await fetch(base + '/');
+  assert.equal(overflow.status, 429);
+  assert.equal(overflow.headers.get('retry-after'), '2');
+  controllers.forEach((c) => c.abort());
+  assert.ok((await queued).every((r) => r.status === 'rejected'));
+  unblock();
+  for (const r of await Promise.all(held)) assert.equal(r.status, 200);
+  const h = await (await fetch(base + '/api/health')).json();
+  assert.equal(h.active, 0);
+  assert.equal(h.queued, 0);
+  assert.equal(h.active_responses, 1);
+  assert.equal(h.queued_responses, 0);
+});
