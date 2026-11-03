@@ -15,6 +15,7 @@ async function fixture(
   fetchImpl = async () => {
     throw Error('unexpected upstream');
   },
+  options = {},
 ) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'worlds-eye-v2-test-'));
   fs.mkdirSync(path.join(root, 'pilot/buildings'), { recursive: true });
@@ -39,6 +40,7 @@ async function fixture(
     root,
     fetchImpl,
     normalize: () => ({ points: [], total: 1 }),
+    ...options,
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
@@ -319,3 +321,21 @@ test('freshness preserves AGEING and uses event publication instead of observati
     'UNKNOWN',
   );
 });
+
+test(
+  'malformed source bodies still consume the shared input byte budget',
+  { timeout: 10000 },
+  async (t) => {
+    const { base } = await fixture(
+      t,
+      async () => new Response(Buffer.alloc(131072, 32)),
+      { bytesPerSecond: 65536 },
+    );
+    const start = performance.now();
+    assert.equal((await fetch(base + '/api/observations')).status, 503);
+    assert.ok(
+      performance.now() - start >= 800,
+      'SOURCE_INPUT_MUST_BE_PACED_BEFORE_PARSE_FAILURE',
+    );
+  },
+);

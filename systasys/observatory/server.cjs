@@ -193,6 +193,19 @@ function createGateway({
     if (next) next.done();
     else active--;
   }
+  // One body-byte budget for source reads and client output. Waiting exists
+  // only while an admitted request is active; there is no idle refill timer.
+  async function paceBody(size, signal) {
+    for (let remaining = size; remaining > 0; remaining -= 65536) {
+      signal.throwIfAborted();
+      const amount = Math.min(remaining, 65536);
+      const wait = Math.max(0, outputAt - performance.now());
+      outputAt =
+        Math.max(performance.now(), outputAt) +
+        (amount / bytesPerSecond) * 1000;
+      if (wait) await delay(wait, undefined, { signal });
+    }
+  }
   async function upstream(url, cap, signal, ttl = 600000) {
     const previous = cache.get(url);
     if (previous && previous.until > Date.now()) return previous;
@@ -209,7 +222,7 @@ function createGateway({
     try {
       signal.throwIfAborted();
       sourceRequests = sourceRequests.filter((t) => Date.now() - t < 60000);
-      if (sourceRequests.length >= 360) throw new Refusal('READ_BUDGET', 429);
+      if (sourceRequests.length >= 512) throw new Refusal('READ_BUDGET', 429);
       sourceRequests.push(Date.now());
       counters.upstream_reads++;
       const response = await fetchImpl(url, {
@@ -240,6 +253,7 @@ function createGateway({
         if (done) break;
         size += value.byteLength;
         if (size > cap) throw new Refusal('SOURCE_CAP', 502);
+        await paceBody(value.byteLength, controller.signal);
         chunks.push(Buffer.from(value));
       }
       const bytes = Buffer.concat(chunks);
@@ -290,12 +304,8 @@ function createGateway({
     });
     for (let i = 0; i < bytes.length; i += 65536) {
       signal.throwIfAborted();
-      const chunk = bytes.subarray(i, i + 65536),
-        wait = Math.max(0, outputAt - performance.now());
-      outputAt =
-        Math.max(performance.now(), outputAt) +
-        (chunk.length / bytesPerSecond) * 1000;
-      if (wait) await delay(wait, undefined, { signal });
+      const chunk = bytes.subarray(i, i + 65536);
+      await paceBody(chunk.length, signal);
       if (res.destroyed) return;
       if (!res.write(chunk))
         await new Promise((resolve, reject) => {
