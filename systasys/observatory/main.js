@@ -286,6 +286,7 @@ function selectPlace(
   title = 'Lieu sélectionné',
   read = true,
   observation = null,
+  reveal = true,
 ) {
   state.point = { lat: point.lat, lon: point.lon };
   state.placeGeneration++;
@@ -304,7 +305,7 @@ function selectPlace(
   }
   $('place-coordinates').textContent =
     `${point.lat.toFixed(5)}° · ${point.lon.toFixed(5)}°`;
-  drawer(true);
+  if (reveal) drawer(true);
   const inside =
     point.lon >= PILOT.bounds[0] &&
     point.lon <= PILOT.bounds[2] &&
@@ -450,7 +451,7 @@ async function approach() {
         state.guard = guardCameraAboveGround(viewer, PILOT);
         $('approach').disabled = false;
         $('approach').firstChild.textContent = 'Recentrer Genève ';
-        selectPlace(PILOT, 'Genève', true);
+        selectPlace(PILOT, 'Genève', true, null, !mobile);
         $('data-state').textContent =
           'Chargement du relief et des bâtiments officiels';
         try {
