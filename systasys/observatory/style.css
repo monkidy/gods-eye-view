@@ -162,8 +162,8 @@ main {
   inset: 0;
 }
 .world .cesium-viewer-bottom {
-  bottom: 34px;
-  left: 18px;
+  bottom: 44px !important;
+  left: 18px !important;
   max-width: calc(100% - 32px);
 }
 .world .cesium-widget-credits {

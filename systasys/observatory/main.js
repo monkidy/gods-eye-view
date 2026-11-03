@@ -397,7 +397,7 @@ async function cityData() {
     tiles.style = new C.Cesium3DTileStyle({ color: "color('#d8d1bf')" });
     viewer.scene.primitives.add(tiles);
     state.tiles = tiles;
-    tiles.tileLoadProgressEvent.addEventListener((pending, processing) => {
+    tiles.loadProgress.addEventListener((pending, processing) => {
       if (viewer !== state.viewer) return;
       $('data-state').textContent =
         pending || processing
