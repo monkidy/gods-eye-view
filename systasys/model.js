@@ -83,3 +83,14 @@ export function normalize(payload, now = Date.now()) {
 export function filterPoints(points, period, enabled = new Set(Object.keys(FEEDS))) {
   return points.filter(p => enabled.has(p.source) && (period === 'all' || (period === 'fresh' ? p.freshness === 'FRESH' : p.freshness !== 'FRESH')))
 }
+
+// Rendering may downgrade freshness, never upgrade AGEING or substitute
+// observation time for NASA's actual event publication time.
+export function observationFreshness(point, now = Date.now()) {
+  if (!point || !Object.hasOwn(FEEDS, point.source)) return 'UNKNOWN'
+  if (point.freshness !== 'FRESH') return point.freshness === 'AGEING' ? 'AGEING' : 'UNKNOWN'
+  const at = utcTimestamp(point.source === 'nasa_eonet_open_events_public' ? point.publishedAt : point.at)
+  if (!Number.isFinite(at) || !Number.isFinite(now)) return 'UNKNOWN'
+  const age = now - at
+  return age >= -60000 && age <= FEEDS[point.source].maxFreshMs ? 'FRESH' : 'AGEING'
+}

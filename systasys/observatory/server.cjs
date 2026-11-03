@@ -110,7 +110,9 @@ function createGateway({
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, 'MANIFEST.json')),
   );
-  const staticManifestSha = hash(fs.readFileSync(path.join(root, 'MANIFEST.json')));
+  const staticManifestSha = hash(
+    fs.readFileSync(path.join(root, 'MANIFEST.json')),
+  );
   const gatewaySha = hash(fs.readFileSync(__filename));
   const derivation = JSON.parse(
     fs.readFileSync(path.join(root, 'pilot/buildings/SOURCE_RECEIPT.json')),
@@ -216,7 +218,9 @@ function createGateway({
         signal: controller.signal,
         headers: {
           Accept:
-            'application/json,application/octet-stream,image/jpeg,image/png',
+            url.startsWith(TERRAIN) && /\.terrain\?v=1\.43646\.0$/.test(url)
+              ? 'application/vnd.quantized-mesh;extensions=octvertexnormals-metadata'
+              : 'application/json,application/octet-stream,image/jpeg,image/png',
           'User-Agent': 'SYSTASYS-WorldsEye/2.0 (+https://hichembenali.com)',
         },
       });
@@ -253,7 +257,7 @@ function createGateway({
       if (ttl > 0) {
         while (
           cache.size &&
-          (cache.size >= 96 || cacheBytes + size > 64 * 1024 * 1024)
+          (cache.size >= 512 || cacheBytes + size > 64 * 1024 * 1024)
         ) {
           const [key, item] = cache.entries().next().value;
           cache.delete(key);
@@ -271,7 +275,7 @@ function createGateway({
       signal.removeEventListener('abort', stop);
       if (reader) {
         try {
-          await reader.cancel();
+          Promise.resolve(reader.cancel()).catch(() => {});
         } catch {}
       }
       release();

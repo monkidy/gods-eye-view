@@ -4,11 +4,11 @@ import {
   imageType,
   CSP,
 } from './server.cjs';
-import { normalize } from '../model.js';
+import { normalize, observationFreshness } from '../model.js';
 
 export const createGateway = (options = {}) =>
   createReader({ normalize, ...options });
-export { resourceQuery, imageType, CSP };
+export { resourceQuery, imageType, CSP, observationFreshness };
 if (typeof require === 'undefined' || require.main === module)
   createGateway().listen(
     Number(process.env.WORLDS_EYE_PORT || 5204),

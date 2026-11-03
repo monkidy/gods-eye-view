@@ -251,3 +251,71 @@ test('tampered static content and symlink escapes cannot be served', async (t) =
   );
   assert.equal((await fetch(base + '/')).status, 503);
 });
+
+test(
+  'a transport cancellation promise that never settles cannot retain capacity',
+  { timeout: 3000 },
+  async (t) => {
+    const { base } = await fixture(
+      t,
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(c) {
+              c.enqueue(new Uint8Array(1048577));
+            },
+            cancel() {
+              return new Promise(() => {});
+            },
+          }),
+        ),
+    );
+    assert.equal((await fetch(base + '/api/observations')).status, 502);
+    assert.equal((await (await fetch(base + '/api/health')).json()).active, 0);
+  },
+);
+test('freshness preserves AGEING and uses event publication instead of observation time', async () => {
+  const { observationFreshness } = process.env.WORLDS_EYE_GATEWAY_MODULE
+    ? require(process.env.WORLDS_EYE_GATEWAY_MODULE)
+    : await import('../model.js');
+  const now = Date.parse('2026-11-03T12:00:00Z');
+  const point = {
+    source: 'nasa_eonet_open_events_public',
+    freshness: 'FRESH',
+    at: '2026-11-03T11:59:00Z',
+    publishedAt: '2026-10-31T12:00:00Z',
+  };
+  assert.equal(observationFreshness(point, now), 'AGEING');
+  assert.equal(
+    observationFreshness(
+      { ...point, publishedAt: '2026-11-03T11:00:00Z' },
+      now,
+    ),
+    'FRESH',
+  );
+  assert.equal(
+    observationFreshness(
+      { ...point, freshness: 'AGEING', publishedAt: '2026-11-03T11:00:00Z' },
+      now,
+    ),
+    'AGEING',
+  );
+  assert.equal(
+    observationFreshness(
+      { ...point, source: 'usgs_earthquakes_global_free', freshness: 'AGEING' },
+      now,
+    ),
+    'AGEING',
+  );
+  assert.equal(
+    observationFreshness(
+      { ...point, source: 'usgs_earthquakes_global_free' },
+      now + 7200000,
+    ),
+    'AGEING',
+  );
+  assert.equal(
+    observationFreshness({ ...point, publishedAt: null }, now),
+    'UNKNOWN',
+  );
+});

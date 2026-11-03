@@ -34,7 +34,7 @@ The gateway only binds127.0.0.1:5204, only permits fixed GET routes, and proxies
 the existing N4 SPECTRA contracts plus three literal official Swiss datasets.
 No arbitrary URL, credentials, redirects, finance, broker or command interface.
 Bounds: four upstream requests, eight active responses,16 upstream waiters,
-360 external reads/minute,18s upstream /35s response deadline,64MiB/96entry
+360 external reads/minute,18s upstream /35s response deadline,64MiB/512entry
 RAM cache,2MiB/s shared output. There is no disk cache, background polling or
 collector. Browser hiding destroys its scene and aborts its own reads; resumption
 is explicit. Render-on-demand and20/30fps targets bound client rendering.

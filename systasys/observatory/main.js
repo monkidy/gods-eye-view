@@ -1,6 +1,6 @@
 import * as C from 'cesium';
 import './style.css';
-import { FEEDS } from '../model.js';
+import { FEEDS, observationFreshness } from '../model.js';
 import {
   readResource,
   resourceCaption,
@@ -20,6 +20,7 @@ const state = {
   viewer: null,
   tiles: null,
   terrainReady: false,
+  tileErrors: 0,
   low: mobile,
   point: { ...PILOT },
   resources: [],
@@ -90,7 +91,7 @@ async function readJson(route, schema, life = state.life) {
     }
   } finally {
     try {
-      await reader.cancel();
+      Promise.resolve(reader.cancel()).catch(() => {});
     } catch {}
   }
   const bytes = new Uint8Array(size);
@@ -136,9 +137,20 @@ function clearImage() {
   $('media-result').textContent = '';
 }
 function currentCaption(p) {
-  const source = FEEDS[p.source],
-    old = Date.now() - Date.parse(p.at) > source.maxFreshMs;
-  return `${source.label} · ${old ? 'vieillissant' : 'récent lors de la lecture'} · ${formatTime(p.publishedAt || p.at)}`;
+  const freshness = observationFreshness(p);
+  const label =
+    freshness === 'FRESH'
+      ? 'récent lors de la lecture'
+      : freshness === 'AGEING'
+        ? 'vieillissant'
+        : 'fraîcheur inconnue';
+  return (
+    FEEDS[p.source].label +
+    ' · ' +
+    label +
+    ' · ' +
+    formatTime(p.publishedAt || p.at)
+  );
 }
 function renderEvents() {
   const now = Date.now(),
@@ -398,10 +410,17 @@ async function cityData() {
     tiles.style = new C.Cesium3DTileStyle({ color: "color('#d8d1bf')" });
     viewer.scene.primitives.add(tiles);
     state.tiles = tiles;
+    tiles.tileFailed.addEventListener(() => {
+      if (viewer !== state.viewer) return;
+      state.tileErrors++;
+      $('data-state').textContent =
+        'Couverture 3D partielle · des bâtiments n’ont pas répondu';
+    });
     tiles.loadProgress.addEventListener((pending, processing) => {
       if (viewer !== state.viewer) return;
-      $('data-state').textContent =
-        pending || processing
+      $('data-state').textContent = state.tileErrors
+        ? 'Couverture 3D partielle · des bâtiments n’ont pas répondu'
+        : pending || processing
           ? `Genève · chargement des volumes (${pending + processing})`
           : state.terrainReady
             ? 'Genève · bâtiments officiels et relief de référence'
@@ -475,6 +494,7 @@ async function boot() {
   state.paused = false;
   $('pause').hidden = true;
   state.terrainReady = false;
+  state.tileErrors = 0;
   state.tiles = null;
   $('fallback').hidden = true;
   $('approach').disabled = false;
