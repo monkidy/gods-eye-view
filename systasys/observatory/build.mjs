@@ -3,6 +3,7 @@ import {
   existsSync,
   readFileSync,
   readdirSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -21,6 +22,7 @@ const r = spawnSync(
   { cwd: root, stdio: 'inherit' },
 );
 if (r.status !== 0) process.exit(r.status || 1);
+rmSync(resolve(app, 'release'), { recursive: true, force: true });
 await build({
   entryPoints: [resolve(app, 'gateway-entry.mjs')],
   outfile: resolve(app, 'release/gateway.cjs'),
